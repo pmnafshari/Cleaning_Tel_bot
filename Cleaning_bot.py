@@ -21,7 +21,6 @@ BOT_TOKEN = "8894155985:AAGwW39GpPK8JZfQwowYfIv_YVAf-Ft4nO0"
 GROUP_CHAT_ID = "-1003663980896"
 
 # ⚠️ بسیار مهم: آدرس اپلیکیشن خود در سایت رندر را در خط زیر جایگزین کنید
-# مثال: https://cleaning-tel-bot.onrender.com
 RENDER_APP_URL = "https://cleaning-tel-bot-3.onrender.com" 
 
 # مراحل گفتگو (States)
@@ -144,9 +143,12 @@ async def show_tasks_keyboard(query, context):
         status = "✅ " if task in selected_tasks else "⬜ "
         keyboard.append([InlineKeyboardButton(f"{status}{task}", callback_data=f"t_{task}")])
     
-    keyboard.append([InlineKeyboardButton("🟢 ثبت و ارسال گزارش نهایی", callback_data="submit_report")])
+    # چیدمان جدید دکمه‌ها
     keyboard.append([
-        InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_zone"),
+        InlineKeyboardButton("🔵 ثبت نهایی", callback_data="submit_report"),
+        InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_zone")
+    ])
+    keyboard.append([
         InlineKeyboardButton("❌ لغو", callback_data="cancel_conv")
     ])
     
@@ -266,7 +268,6 @@ def main():
     # --- سیستم هوشمند اجرا ---
     port = int(os.environ.get("PORT", 10000))
     
-    # اگر آدرس سایت رندر را وارد کرده باشید، روی سرور با سرعت بالا (Webhook) اجرا می‌شود
     if "your-app-name" not in RENDER_APP_URL:
         logger.info("Starting Webhook...")
         application.run_webhook(
@@ -274,7 +275,6 @@ def main():
             port=port,
             webhook_url=RENDER_APP_URL
         )
-    # اگر آدرس را تغییر ندهید و بخواهید روی سیستم خودتان تست کنید، با Polling اجرا می‌شود
     else:
         logger.info("Starting Polling (Local Mode)...")
         application.run_polling(close_loop=False, drop_pending_updates=True)
