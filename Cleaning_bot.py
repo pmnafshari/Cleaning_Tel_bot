@@ -22,7 +22,7 @@ GROUP_CHAT_ID = "-1003663980896"
 
 # ⚠️ بسیار مهم: آدرس اپلیکیشن خود در سایت رندر را در خط زیر جایگزین کنید
 # مثال: https://cleaning-tel-bot.onrender.com
-RENDER_APP_URL = "https://your-app-name.onrender.com" 
+RENDER_APP_URL = "https://cleaning-tel-bot-3.onrender.com" 
 
 # مراحل گفتگو (States)
 CHOOSING_PERSON, CHOOSING_ZONE, CHOOSING_TASKS = range(3)
