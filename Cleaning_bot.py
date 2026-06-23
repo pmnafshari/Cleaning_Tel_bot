@@ -1,3 +1,4 @@
+import os
 import logging
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -19,6 +20,10 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = "8894155985:AAGwW39GpPK8JZfQwowYfIv_YVAf-Ft4nO0"
 GROUP_CHAT_ID = "-1003663980896"
 
+# ⚠️ بسیار مهم: آدرس اپلیکیشن خود در سایت رندر را در خط زیر جایگزین کنید
+# مثال: https://cleaning-tel-bot.onrender.com
+RENDER_APP_URL = "https://your-app-name.onrender.com" 
+
 # مراحل گفتگو (States)
 CHOOSING_PERSON, CHOOSING_ZONE, CHOOSING_TASKS = range(3)
 
@@ -38,7 +43,6 @@ TASKS = {
     ]
 }
 
-# دستور راه‌اندازی در گروه
 async def group_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type in ["group", "supergroup"]:
         bot_username = (await context.bot.get_me()).username
@@ -61,7 +65,6 @@ async def group_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ این دستور فقط مخصوص اجرا در گروه است.")
 
-# شروع فرایند با دستور /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear() 
     
@@ -69,21 +72,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     keyboard.append([InlineKeyboardButton("❌ لغو عملیات", callback_data="cancel_conv")])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    text = "🧹 **برنامه نظافت خونه**\nلطفا فرد مسئول را انتخاب کنید:"
     if update.message:
-        await update.message.reply_text("🧹 **برنامه نظافت خونه**\nلطفا فرد مسئول را انتخاب کنید:", reply_markup=reply_markup, parse_mode="Markdown")
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await update.callback_query.edit_message_text("🧹 **برنامه نظافت خونه**\nلطفا فرد مسئول را انتخاب کنید:", reply_markup=reply_markup, parse_mode="Markdown")
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
         
     return CHOOSING_PERSON
 
-# مرحله اول: انتخاب شخص
 async def person_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     
-    if query.data == "cancel_conv":
-        return await cancel_inline(query)
-        
     person = query.data.split("_")[1]
     context.user_data["person"] = person
     
@@ -102,18 +103,29 @@ async def person_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     )
     return CHOOSING_ZONE
 
-# مرحله دوم: انتخاب منطقه
+async def show_zones_again(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    keyboard = [
+        [InlineKeyboardButton(ZONES["1"], callback_data="z_1")],
+        [InlineKeyboardButton(ZONES["2"], callback_data="z_2")],
+        [InlineKeyboardButton("🔙 بازگشت به مرحله قبل", callback_data="back_to_person"),
+         InlineKeyboardButton("❌ لغو", callback_data="cancel_conv")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        text=f"👤 مسئول: **{context.user_data.get('person', 'نامشخص')}**\n\n📍 لطفا منطقه نظافت را انتخاب کنید:", 
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+    return CHOOSING_ZONE
+
 async def zone_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     
-    if query.data == "cancel_conv":
-        return await cancel_inline(query)
-    if query.data == "back_to_person":
-        return await start(update, context)
-        
     zone_code = query.data.split("_")[1]
-    zone_name = ZONES[zone_code]
+    zone_name = ZONES.get(zone_code, "نامشخص")
     context.user_data["zone"] = zone_name
     
     if "selected_tasks" not in context.user_data:
@@ -122,11 +134,10 @@ async def zone_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     await show_tasks_keyboard(query, context)
     return CHOOSING_TASKS
 
-# تابع کمکی نمایش کارها
 async def show_tasks_keyboard(query, context):
-    zone_name = context.user_data["zone"]
-    selected_tasks = context.user_data["selected_tasks"]
-    all_tasks = TASKS[zone_name]
+    zone_name = context.user_data.get("zone", "نامشخص")
+    selected_tasks = context.user_data.get("selected_tasks", [])
+    all_tasks = TASKS.get(zone_name, [])
     
     keyboard = []
     for task in all_tasks:
@@ -142,67 +153,21 @@ async def show_tasks_keyboard(query, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(
-        text=f"👤 مسئول: **{context.user_data['person']}**\n📍 منطقه: **{zone_name}**\n\n📋 کارهای انجام شده را تیک بزنید:",
+        text=f"👤 مسئول: **{context.user_data.get('person')}**\n📍 منطقه: **{zone_name}**\n\n📋 کارهای انجام شده را تیک بزنید:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
 
-# مرحله سوم: مدیریت تیک‌ها و ثبت نهایی
-async def task_toggle_or_submit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def task_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     
-    data = query.data
-    
-    if data == "cancel_conv":
-        return await cancel_inline(query)
-    if data == "back_to_zone":
-        keyboard = [
-            [InlineKeyboardButton(ZONES["1"], callback_data="z_1")],
-            [InlineKeyboardButton(ZONES["2"], callback_data="z_2")],
-            [InlineKeyboardButton("🔙 بازگشت به مرحله قبل", callback_data="back_to_person"),
-             InlineKeyboardButton("❌ لغو", callback_data="cancel_conv")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            text=f"👤 مسئول: **{context.user_data['person']}**\n\n📍 لطفا منطقه نظافت را انتخاب کنید:", 
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-        return CHOOSING_ZONE
+    try:
+        task_name = query.data.split("t_")[1]
+    except IndexError:
+        return CHOOSING_TASKS
 
-    if data == "submit_report":
-        person = context.user_data["person"]
-        zone = context.user_data["zone"]
-        selected_tasks = context.user_data["selected_tasks"]
-        
-        if not selected_tasks:
-            selected_tasks_str = "• هیچ کاری انتخاب نشده است."
-        else:
-            selected_tasks_str = "\n".join([f"• {t}" for t in selected_tasks])
-            
-        now_gregorian = datetime.now().strftime("%Y-%m-%d %H:%M")
-        
-        report_text = (
-            f"✨ **گزارش نظافت جدید** ✨\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👤 **پیک می:** {person}\n"
-            f"📍 **منطقه:** {zone}\n"
-            f"📅 **تاریخ و زمان:** {now_gregorian}\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"📋 **کارهای انجام شده:**\n{selected_tasks_str}"
-        )
-        
-        try:
-            await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=report_text, parse_mode="Markdown")
-            await query.edit_message_text("✅ گزارش با موفقیت ثبت و به گروه ارسال شد.")
-        except Exception as e:
-            await query.edit_message_text(f"❌ خطا در ارسال به گروه. مطمئن شوید بات در گروه عضو و ادمین است.\nخطا: {e}")
-            
-        return ConversationHandler.END
-
-    task_name = data.split("_")[1]
-    selected_tasks = context.user_data["selected_tasks"]
+    selected_tasks = context.user_data.get("selected_tasks", [])
     
     if task_name in selected_tasks:
         selected_tasks.remove(task_name)
@@ -213,6 +178,39 @@ async def task_toggle_or_submit(update: Update, context: ContextTypes.DEFAULT_TY
     await show_tasks_keyboard(query, context)
     return CHOOSING_TASKS
 
+async def submit_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    person = context.user_data.get("person", "نامشخص")
+    zone = context.user_data.get("zone", "نامشخص")
+    selected_tasks = context.user_data.get("selected_tasks", [])
+    
+    if not selected_tasks:
+        selected_tasks_str = "• هیچ کاری انتخاب نشده است."
+    else:
+        selected_tasks_str = "\n".join([f"• {t}" for t in selected_tasks])
+        
+    now_gregorian = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    report_text = (
+        f"✨ **گزارش نظافت جدید** ✨\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 **پیک می:** {person}\n"
+        f"📍 **منطقه:** {zone}\n"
+        f"📅 **تاریخ و زمان:** {now_gregorian}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"📋 **کارهای انجام شده:**\n{selected_tasks_str}"
+    )
+    
+    try:
+        await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=report_text, parse_mode="Markdown")
+        await query.edit_message_text("✅ گزارش با موفقیت ثبت و به گروه ارسال شد.")
+    except Exception as e:
+        await query.edit_message_text(f"❌ خطا در ارسال به گروه. مطمئن شوید بات در گروه عضو و ادمین است.\nخطا: {e}")
+        
+    return ConversationHandler.END
+
 async def timeout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     msg = "⏱ زمان پاسخگویی شما به پایان رسید. برای شروع مجدد دستور /start را ارسال کنید."
     if update.callback_query:
@@ -221,7 +219,9 @@ async def timeout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(msg)
     return ConversationHandler.END
 
-async def cancel_inline(query) -> int:
+async def cancel_inline(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
     await query.edit_message_text("❌ عملیات ثبت گزارش نظافت لغو شد.")
     return ConversationHandler.END
 
@@ -237,17 +237,47 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            CHOOSING_PERSON: [CallbackQueryHandler(person_chosen)],
-            CHOOSING_ZONE: [CallbackQueryHandler(zone_chosen)],
-            CHOOSING_TASKS: [CallbackQueryHandler(task_toggle_or_submit)],
-            ConversationHandler.TIMEOUT: [CallbackQueryHandler(timeout_handler), CommandHandler("start", start)]
+            CHOOSING_PERSON: [
+                CallbackQueryHandler(cancel_inline, pattern="^cancel_conv$"),
+                CallbackQueryHandler(person_chosen, pattern="^p_")
+            ],
+            CHOOSING_ZONE: [
+                CallbackQueryHandler(cancel_inline, pattern="^cancel_conv$"),
+                CallbackQueryHandler(start, pattern="^back_to_person$"),
+                CallbackQueryHandler(zone_chosen, pattern="^z_")
+            ],
+            CHOOSING_TASKS: [
+                CallbackQueryHandler(cancel_inline, pattern="^cancel_conv$"),
+                CallbackQueryHandler(show_zones_again, pattern="^back_to_zone$"),
+                CallbackQueryHandler(submit_report, pattern="^submit_report$"),
+                CallbackQueryHandler(task_toggle, pattern="^t_")
+            ],
+            ConversationHandler.TIMEOUT: [
+                CallbackQueryHandler(timeout_handler), 
+                CommandHandler("start", start)
+            ]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         conversation_timeout=180 
     )
 
     application.add_handler(conv_handler)
-    application.run_polling(close_loop=False, drop_pending_updates=True)
+    
+    # --- سیستم هوشمند اجرا ---
+    port = int(os.environ.get("PORT", 10000))
+    
+    # اگر آدرس سایت رندر را وارد کرده باشید، روی سرور با سرعت بالا (Webhook) اجرا می‌شود
+    if "your-app-name" not in RENDER_APP_URL:
+        logger.info("Starting Webhook...")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=RENDER_APP_URL
+        )
+    # اگر آدرس را تغییر ندهید و بخواهید روی سیستم خودتان تست کنید، با Polling اجرا می‌شود
+    else:
+        logger.info("Starting Polling (Local Mode)...")
+        application.run_polling(close_loop=False, drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
