@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # --- اطلاعات اختصاصی شما ---
 BOT_TOKEN = "8894155985:AAGwW39GpPK8JZfQwowYfIv_YVAf-Ft4nO0"
-GROUP_CHAT_ID = "-1003663980896"
+GROUP_CHAT_ID = "-3963196618"
 
 # ⚠️ بسیار مهم: آدرس اپلیکیشن خود در سایت رندر را در خط زیر جایگزین کنید
 RENDER_APP_URL = "https://cleaning-tel-bot-3.onrender.com" 
