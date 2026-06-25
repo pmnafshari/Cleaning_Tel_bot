@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 # --- اطلاعات اختصاصی شما ---
 BOT_TOKEN = "8894155985:AAFwVhLpEy5QuxlJzA9G65wx28mZb4aeGKA"
 GROUP_CHAT_ID = "-3963196618"
-
-# ⚠️ بسیار مهم: آدرس اپلیکیشن خود در سایت رندر را در خط زیر جایگزین کنید
 RENDER_APP_URL = "https://cleaning-tel-bot-3.onrender.com" 
 
 # مراحل گفتگو (States)
@@ -143,7 +141,6 @@ async def show_tasks_keyboard(query, context):
         status = "✅ " if task in selected_tasks else "⬜ "
         keyboard.append([InlineKeyboardButton(f"{status}{task}", callback_data=f"t_{task}")])
     
-    # چیدمان جدید دکمه‌ها
     keyboard.append([
         InlineKeyboardButton("🔵 ثبت نهایی", callback_data="submit_report"),
         InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_zone")
@@ -209,7 +206,7 @@ async def submit_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await context.bot.send_message(chat_id=GROUP_CHAT_ID, text=report_text, parse_mode="Markdown")
         await query.edit_message_text("✅ گزارش با موفقیت ثبت و به گروه ارسال شد.")
     except Exception as e:
-        await query.edit_message_text(f"❌ خطا در ارسال به گروه. مطمئن شوید بات در گروه عضو و ادمین است.\nخطا: {e}")
+        await query.edit_message_text(f"❌ خطا در ارسال به گروه. مطمئن شوید بات در گروه عضو است.\nخطا: {e}")
         
     return ConversationHandler.END
 
@@ -265,11 +262,11 @@ def main():
 
     application.add_handler(conv_handler)
     
-    # --- سیستم هوشمند اجرا ---
     port = int(os.environ.get("PORT", 10000))
     
-    if "your-app-name" not in RENDER_APP_URL:
-        logger.info("Starting Webhook...")
+    # اجرای وب‌هوک روی سرور رندر
+    if RENDER_APP_URL and "onrender.com" in RENDER_APP_URL:
+        logger.info("Starting Webhook on Render...")
         application.run_webhook(
             listen="0.0.0.0",
             port=port,
