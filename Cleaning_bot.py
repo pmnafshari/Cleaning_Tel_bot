@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # --- اطلاعات اختصاصی شما ---
 BOT_TOKEN = "8894155985:AAFwVhLpEy5QuxlJzA9G65wx28mZb4aeGKA"
 GROUP_CHAT_ID = "-3963196618"
-RENDER_APP_URL = "https://cleaning-tel-bot-3.onrender.com" 
+RENDER_APP_URL = "https://cleaning-tel-bot-new.onrender.com" 
 
 # مراحل گفتگو (States)
 CHOOSING_PERSON, CHOOSING_ZONE, CHOOSING_TASKS = range(3)
